@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel Self-Checkout</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <div class="tela-login" id="telaLogin" hidden>
+    <form id="formLogin">
+      <h1>Painel Self-Checkout</h1>
+      <label>Usuário <input name="usuario" autocomplete="username" required></label>
+      <label>Senha <input name="senha" type="password" autocomplete="current-password" required></label>
+      <p class="aviso-caps" id="avisoCaps" hidden>Caps Lock está ligado.</p>
+      <p class="erro" id="erroLogin" role="alert"></p>
+      <button class="primario" type="submit">Entrar</button>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <a class="pular" id="pular" href="#principal">Pular para os caixas</a>
+
+    <!-- Ícones de traço (cor do texto) da barra lateral -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="i-som" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+      <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></symbol>
+      <symbol id="i-config" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 6.2l2.1 2.1M17.7 15.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 17.8l2.1-2.1M17.7 8.3l2.1-2.1"/></symbol>
+      <symbol id="i-sair" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></symbol>
+    </svg>
+
+    <!-- Barra lateral: contadores, filtros e ações. O topo fica só com a fila de alertas. -->
+    <aside class="lateral" id="lateral" aria-label="Painel">
+      <div class="lat-cab">
+        <h1 class="lat-marca">Painel Self-Checkout</h1>
+        <button type="button" id="btnMenu" class="lat-recolher" aria-controls="lateral" aria-expanded="true" aria-label="Recolher menu" title="Recolher menu">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/><path class="seta" d="M15.5 9.5 13 12l2.5 2.5"/></svg>
+        </button>
+      </div>
+      <div class="contadores">
+        <span class="c-alerta" id="cAlerta" title="Caixas em alerta"><b id="nAlerta">0</b><span class="rot">em alerta</span></span>
+        <span class="c-on" title="Caixas operando"><b id="nOperando">0</b><span class="rot">operando</span></span>
+        <span class="c-off" title="Caixas sem conexão"><b id="nOffline">0</b><span class="rot">sem conexão</span></span>
+      </div>
+      <div class="lat-grupo lat-filtros">
+        <div class="filtros" id="filtros" role="group" aria-label="Filtrar caixas"></div>
+      </div>
+      <div class="lat-grupo lat-tamanhos">
+        <span class="lat-rotulo">Telas</span>
+        <div class="tamanhos" id="tamanhos" role="group" aria-label="Tamanho das telas">
+          <button data-tamanho="auto" aria-pressed="true" title="Auto: as telas ficam do maior tamanho em que todos os caixas cabem no monitor, sem rolar">Auto</button>
+          <button data-tamanho="p" aria-pressed="false" aria-label="Telas pequenas" title="Pequenas: tamanho fixo; pode precisar rolar">P</button>
+          <button data-tamanho="m" aria-pressed="false" aria-label="Telas médias" title="Médias: tamanho fixo; pode precisar rolar">M</button>
+          <button data-tamanho="g" aria-pressed="false" aria-label="Telas grandes" title="Grandes: tamanho fixo; pode precisar rolar">G</button>
+        </div>
+      </div>
+      <div class="lat-rodape">
+        <p class="lat-atalhos" aria-label="Atalhos de teclado">
+          <span><kbd>nº</kbd> abre o PDV</span>
+          <span><kbd>F10</kbd> fecha a tela</span>
+        </p>
+        <span class="conexao" id="conexao" title="Conexão com o servidor"><span class="rot" id="conexaoTexto">Ao vivo</span></span>
+        <button id="btnSom" class="lat-acao"><svg class="ico" aria-hidden="true"><use href="#i-mudo"/></svg><span class="rot">Som desligado</span></button>
+        <a class="lat-acao" id="linkConfig" href="/admin" hidden title="Configurações"><svg class="ico" aria-hidden="true"><use href="#i-config"/></svg><span class="rot">Configurações</span></a>
+        <div class="lat-conta">
+          <span class="usuario" id="usuario"></span>
+          <button id="btnSair" class="lat-sair" title="Sair" aria-label="Sair"><svg class="ico" aria-hidden="true"><use href="#i-sair"/></svg></button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="conteudo">
+      <div class="cabecalho" id="cabecalho">
+        <div class="faixa-conexao" id="faixaConexao" role="alert" hidden>
+          <strong>Sem conexão com o servidor há <span id="tempoQueda">0s</span>.</strong>
+          <span>Os caixas abaixo podem estar desatualizados. Tentando reconectar…</span>
+        </div>
+
+        <section class="fila" id="fila" aria-label="Fila de alertas, do mais urgente para o menos urgente"></section>
+        <!-- Alertas que não couberam na linha da fila: abre por cima das telas, sem mudar a altura do topo -->
+        <div class="fila-mais" id="filaMais" role="region" aria-label="Demais alertas" hidden></div>
+      </div>
+
+      <div class="so-leitor" id="anuncio" aria-live="assertive"></div>
+      <div class="so-leitor" id="anuncioCalmo" aria-live="polite"></div>
+      <main id="principal" tabindex="-1" aria-label="Caixas"></main>
+    </div>
+    <button class="fora-tela" id="foraTela" hidden></button>
+
+    <!-- Caixa ampliado: controle de mouse e teclado ligado -->
+    <div class="zoom" id="zoom" hidden role="dialog" aria-modal="true" aria-labelledby="zoomTitulo">
+      <div class="zoom-fundo" id="zoomFundo"></div>
+      <div class="zoom-janela" id="zoomJanela">
+        <div class="zoom-barra">
+          <strong id="zoomTitulo"></strong>
+          <span class="zoom-estado" id="zoomEstado" role="status"></span>
+          <button id="zoomTentar" hidden>Tentar de novo</button>
+          <button id="zoomCad" class="secundario" aria-disabled="true" title="Enviar Ctrl+Alt+Del para o caixa (pede confirmação)">Ctrl+Alt+Del</button>
+          <button id="zoomFechar" class="fechar" aria-keyshortcuts="F10" title="Fechar (F10 fecha mesmo com o teclado controlando o caixa)">Fechar <kbd>F10</kbd></button>
+        </div>
+        <!-- Alerta do caixa ampliado: linha própria abaixo da barra (não cobre os botões do self) -->
+        <div class="zoom-alerta" id="zoomAlerta" hidden></div>
+        <div class="zoom-tela">
+          <canvas class="zoom-previa" id="zoomPrevia" aria-hidden="true"></canvas>
+          <div class="zoom-vnc" id="zoomVnc"></div>
+          <div class="zoom-msg" id="zoomMsg" hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/novnc.js"></script>
+  <script src="painel.js" type="module"></script>
+</body>
+</html>

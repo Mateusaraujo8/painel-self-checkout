@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configurações · Painel Self-Checkout</title>
+  <link rel="stylesheet" href="estilo.css">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="adm">
+  <div class="tela-login" id="telaLogin" hidden>
+    <form id="formLogin">
+      <h1>Configurações do Painel Self-Checkout</h1>
+      <label>Usuário <input name="usuario" autocomplete="username" required></label>
+      <label>Senha <input name="senha" type="password" autocomplete="current-password" required></label>
+      <p class="erro" id="erroLogin" role="alert"></p>
+      <button class="primario" type="submit">Entrar</button>
+    </form>
+  </div>
+
+  <div class="tela-login" id="telaRestrita" hidden>
+    <div class="restrito">
+      <h1>Acesso restrito</h1>
+      <p>As configurações são só para o nível TI / Administrador. Você entrou como <strong id="restritoQuem"></strong>, que é do nível Fiscal.</p>
+      <div class="linha-botoes">
+        <a class="botao" href="/" data-painel>Voltar ao painel</a>
+        <button id="btnSairRestrito">Entrar com outro usuário</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <!-- Ícones (traço, cor do texto) usados na barra lateral -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="i-saude" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></symbol>
+      <symbol id="i-indicadores" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+      <symbol id="i-cadastro" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
+      <symbol id="i-usuarios" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></symbol>
+      <symbol id="i-registro" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-painel" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></symbol>
+      <symbol id="i-sair" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></symbol>
+    </svg>
+
+    <aside class="adm-lateral" id="menuLateral">
+      <div class="adm-cab-lateral">
+        <div class="adm-marca">
+          <h1>Configurações</h1>
+          <span class="adm-produto">Painel Self-Checkout</span>
+        </div>
+        <button type="button" id="btnRecolher" class="adm-recolher" aria-controls="menuLateral" aria-expanded="true" aria-label="Recolher menu" title="Recolher menu">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M9 4v16"/><path class="seta" d="M15.5 9.5 13 12l2.5 2.5"/></svg>
+        </button>
+      </div>
+      <nav class="adm-abas" aria-label="Seções">
+        <a href="#saude" data-aba="saude"><svg class="ico"><use href="#i-saude"/></svg><span>Saúde dos agentes</span></a>
+        <a href="#indicadores" data-aba="indicadores"><svg class="ico"><use href="#i-indicadores"/></svg><span>Indicadores</span></a>
+        <a href="#cadastro" data-aba="cadastro"><svg class="ico"><use href="#i-cadastro"/></svg><span>Lojas e caixas</span></a>
+        <a href="#usuarios" data-aba="usuarios"><svg class="ico"><use href="#i-usuarios"/></svg><span>Usuários</span></a>
+        <a href="#registro" data-aba="registro"><svg class="ico"><use href="#i-registro"/></svg><span>Registro</span></a>
+      </nav>
+      <div class="adm-rodape">
+        <a href="/" class="adm-voltar" data-painel aria-label="Voltar ao painel" title="Voltar ao painel"><svg class="ico" aria-hidden="true"><use href="#i-painel"/></svg><span>Voltar ao painel</span></a>
+        <div class="adm-conta">
+          <div class="adm-quem">
+            <strong id="usuarioLogado"></strong>
+            <span class="adm-servidor" id="servidor" title="Servidor que você está alterando"></span>
+          </div>
+          <button id="btnSair" class="adm-sair" title="Sair" aria-label="Sair"><svg class="ico"><use href="#i-sair"/></svg></button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="adm-main">
+      <section id="aba-saude" class="aba" aria-labelledby="t-saude" hidden></section>
+      <section id="aba-indicadores" class="aba" aria-labelledby="t-indicadores" hidden></section>
+      <section id="aba-cadastro" class="aba" aria-labelledby="t-cadastro" hidden></section>
+      <section id="aba-usuarios" class="aba" aria-labelledby="t-usuarios" hidden></section>
+      <section id="aba-registro" class="aba" aria-labelledby="t-registro" hidden></section>
+    </main>
+
+    <div class="pendente" id="pendente" role="region" aria-label="Alterações não salvas" hidden>
+      <span id="pendenteTexto"></span>
+      <button id="btnDescartar">Descartar</button>
+      <button id="btnRevisar" class="primario">Revisar e salvar</button>
+    </div>
+
+    <dialog id="dlg" class="adm-dialogo" aria-labelledby="dlgTitulo">
+      <form method="dialog" id="dlgForm" novalidate>
+        <h2 id="dlgTitulo"></h2>
+        <div id="dlgCorpo"></div>
+        <p class="erro" id="dlgErro" role="alert"></p>
+        <div class="linha-botoes fim">
+          <button type="button" id="dlgCancelar">Cancelar</button>
+          <button type="submit" id="dlgOk" class="primario"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="aviso-flutuante" id="aviso" role="status" aria-live="polite" hidden></div>
+    <div class="dica-grafico" id="dicaGrafico" role="tooltip" hidden></div>
+  </div>
+
+  <script src="admin.js" type="module"></script>
+</body>
+</html>

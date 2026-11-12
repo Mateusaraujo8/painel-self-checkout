@@ -1,0 +1,23 @@
+{
+  "semEstacao": "nenhum",
+  "lojas": {
+    "1": "Loja Centro",
+    "2": "Loja Norte"
+  },
+  "caixas": [
+    { "ip": "192.0.2.50", "loja": 1, "pdv": 50 },
+    { "ip": "192.0.2.51", "loja": 1, "pdv": 51 },
+    { "ip": "192.0.2.10", "loja": 1, "pdv": 10, "tipo": "pdv" },
+    { "ip": "198.51.100.50", "loja": 2, "pdv": 50 }
+  ],
+  "estacoes": [
+    {
+      "nome": "Loja Centro · selfs 50 e 51",
+      "computadores": ["192.0.2.200", "192.0.2.*"],
+      "caixas": [
+        { "ip": "192.0.2.50", "loja": 1, "pdv": 50 },
+        { "ip": "192.0.2.51", "loja": 1, "pdv": 51 }
+      ]
+    }
+  ]
+}

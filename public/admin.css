@@ -1,0 +1,522 @@
+/* Administração: o mesmo mundo do painel (Torre de controle, sempre escuro), mas lido de
+   perto, sentado. Mais denso: tabelas, filtros e diálogos. Cor só para estado. */
+.adm {
+  --t-corpo: 14px;
+  --t-apoio: 13px;
+  --t-titulo: 20px;
+  min-height: 100vh;
+}
+@media (min-width: 1600px) {
+  .adm { --t-corpo: 15px; --t-apoio: 13px; --t-titulo: 22px; }
+}
+
+a { color: var(--venda); text-underline-offset: 3px; }
+code, .mono { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: .92em; }
+.apoio { color: var(--texto-2); font-size: var(--t-apoio); }
+.apoio.bloco, .bloco.apoio { display: block; margin-top: 2px; }
+.nowrap { white-space: nowrap; }
+.linha-botoes { display: flex; gap: var(--e-2); flex-wrap: wrap; align-items: center; }
+.linha-botoes.fim { justify-content: flex-end; }
+
+/* Botões e campos (complementa a base do painel) */
+a.botao {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+  text-decoration: none;
+}
+a.botao:hover { background: var(--superficie-2); }
+button.texto {
+  background: transparent;
+  border-color: transparent;
+  color: var(--venda);
+  padding: 4px 8px;
+  min-height: 32px;
+}
+button.texto:hover { background: var(--superficie-2); border-color: var(--borda); }
+button.perigo { background: var(--critico); border-color: var(--critico); color: #1f0a0b; font-weight: 650; }
+button.perigo:hover { background: color-mix(in srgb, var(--critico) 85%, white); }
+/* Remover: neutro na lista (não pinta dezenas de linhas de vermelho); vermelho ao apontar.
+   A confirmação continua no diálogo. */
+button.texto.perigo-texto { color: var(--texto-2); }
+button.texto.perigo-texto:hover, button.texto.perigo-texto:focus-visible { color: var(--critico); }
+select, textarea {
+  font: inherit;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+textarea { width: 100%; resize: vertical; }
+select:focus-visible, textarea:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+input[readonly] { color: var(--texto-2); background: var(--fundo); }
+input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--venda); margin: 0; }
+input[type='date'] { width: auto; color-scheme: dark; }
+.erro { color: var(--critico); margin: 0; white-space: pre-line; }
+.erro:empty { display: none; }
+
+/* ------------------------------------------------------------ barra lateral */
+/* Navegação fixa à esquerda: marca no alto, seções no meio, conta e servidor no rodapé.
+   O conteúdo ganha a largura toda da direita e a altura toda da tela. */
+#app:not([hidden]) {
+  --lateral: 236px;
+  --mov: 220ms cubic-bezier(.2, .8, .2, 1); /* sai rápido, assenta suave */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 100vh;
+}
+#app:not([hidden]) > .adm-lateral { width: var(--lateral); overflow: hidden; transition: width var(--mov); }
+#app.menu-recolhido { --lateral: 68px; }
+#app.sem-animacao, #app.sem-animacao * { transition: none !important; }
+
+/* Cabeçalho da barra: marca e o botão de recolher. */
+.adm-cab-lateral { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2); min-height: 40px; }
+.adm-recolher {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--texto-3);
+  transition: color .12s ease-out, background-color .12s ease-out, transform var(--mov);
+}
+.adm-recolher:hover { color: var(--texto); background: var(--superficie-2); border-color: var(--borda); }
+.adm-recolher:active { transform: scale(.92); }
+.adm-recolher .seta { transform-box: fill-box; transform-origin: center; transition: transform var(--mov); }
+.menu-recolhido .adm-recolher .seta { transform: rotate(180deg); }
+
+/* Textos da barra somem/aparecem junto com a largura (sem quebrar linha no meio). */
+.adm-marca, .adm-abas a span, .adm-voltar span, .adm-quem {
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 160ms ease-out, max-width var(--mov);
+  max-width: 180px;
+}
+.menu-recolhido .adm-marca, .menu-recolhido .adm-abas a span, .menu-recolhido .adm-voltar span, .menu-recolhido .adm-quem {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+}
+.menu-recolhido .adm-cab-lateral { justify-content: center; }
+.menu-recolhido .adm-marca { position: absolute; }
+.menu-recolhido .adm-abas a, .menu-recolhido .adm-voltar { gap: 0; justify-content: center; padding: 0; }
+.menu-recolhido .adm-conta { justify-content: center; padding-inline: 0; gap: 0; }
+/* Windows com "efeitos de animação" desligados: mantém um movimento curto e discreto
+   (o recolher continua dando para acompanhar, sem deslizar devagar). */
+@media (prefers-reduced-motion: reduce) {
+  #app:not([hidden]) { --mov: 140ms ease-out; }
+}
+.adm-lateral {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-5);
+  padding: var(--e-5) var(--e-3);
+  background: var(--superficie);
+  border-right: 1px solid var(--borda);
+}
+.adm-marca { display: grid; gap: 1px; padding: 0 var(--e-3); }
+.adm-marca h1 { margin: 0; font-size: 17px; line-height: 1.25; }
+.adm-produto { color: var(--texto-3); font-size: 12px; }
+.ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.adm-abas { display: grid; gap: 2px; }
+.adm-abas a, .adm-voltar {
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  min-height: 38px;
+  padding: 0 var(--e-3);
+  border-radius: 8px;
+  color: var(--texto-2);
+  text-decoration: none;
+  font-weight: 550;
+  transition: background-color .12s ease-out, color .12s ease-out;
+}
+.adm-abas a .ico, .adm-voltar .ico { color: var(--texto-3); transition: color .12s ease-out; }
+.adm-abas a:hover, .adm-voltar:hover { color: var(--texto); background: color-mix(in srgb, var(--texto) 5%, var(--superficie)); }
+.adm-abas a:hover .ico, .adm-voltar:hover .ico { color: var(--texto-2); }
+/* Seção atual: fundo claramente mais claro que o hover, texto e ícone brancos (sem azul,
+   que no painel quer dizer "em venda"). */
+.adm-abas a[aria-current='page'] { color: var(--texto); background: color-mix(in srgb, var(--texto) 12%, var(--superficie)); font-weight: 650; }
+.adm-abas a[aria-current='page'] .ico { color: var(--texto); }
+.adm-abas a:focus-visible, .adm-voltar:focus-visible { outline: 2px solid var(--foco); outline-offset: -2px; }
+.adm-rodape { margin-top: auto; display: grid; gap: var(--e-2); }
+.adm-conta {
+  display: flex;
+  align-items: center;
+  gap: var(--e-2);
+  padding: var(--e-3);
+  border-top: 1px solid var(--borda);
+}
+.adm-quem { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.adm-quem strong { font-size: var(--t-apoio); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-servidor { color: var(--texto-3); font-size: 12px; font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-sair {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--texto-2);
+}
+.adm-sair:hover { color: var(--texto); background: var(--superficie-2); border-color: var(--borda); }
+
+.adm-main { padding: var(--e-6) var(--e-8); width: 100%; max-width: 1560px; padding-bottom: 96px; }
+.aba-cab { margin-bottom: var(--e-5); }
+.aba-cab h2 { margin: 0 0 var(--e-1); font-size: var(--t-titulo); line-height: 1.25; }
+.aba-cab p { margin: 0; max-width: 80ch; }
+.aba-cab.com-acao { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--e-4); flex-wrap: wrap; }
+
+/* ------------------------------------------------------------ filtros */
+.barra-filtros { display: flex; gap: var(--e-3) var(--e-5); align-items: center; flex-wrap: wrap; margin-bottom: var(--e-4); }
+.campo-inline { display: inline-flex; align-items: center; gap: var(--e-2); color: var(--texto-2); font-size: var(--t-apoio); }
+.campo-inline input:not([type='date']) { width: auto; }
+.segmentos { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.segmentos button { border-radius: 999px; padding: 4px 12px; min-height: 34px; color: var(--texto-2); }
+.segmentos button b { color: var(--texto); margin-left: 4px; }
+.segmentos button[aria-pressed='true'] { background: var(--texto); color: var(--superficie); border-color: var(--texto); }
+.segmentos button[aria-pressed='true'] b { color: var(--superficie); }
+
+.dica-acao {
+  margin-bottom: var(--e-4);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid color-mix(in srgb, var(--alerta) 45%, var(--borda));
+  background: color-mix(in srgb, var(--alerta) 6%, var(--superficie));
+  border-radius: 10px;
+}
+.dica-acao p { margin: 0 0 var(--e-2); }
+.comando { display: flex; gap: var(--e-2); align-items: stretch; margin-top: var(--e-2); }
+.comando code {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+/* ------------------------------------------------------------ tabelas */
+/* "clip" (e não "auto"): corta os cantos sem virar área de rolagem, assim o cabeçalho da
+   tabela gruda no alto da janela ao rolar. Em tela estreita volta a rolar de lado. */
+.tabela-wrap { overflow-x: clip; border: 1px solid var(--borda); border-radius: 10px; background: var(--superficie); }
+/* Tela estreita: a tabela rola de lado, com a barra de rolagem visível (pista de que há mais colunas). */
+@media (max-width: 1000px) { .tabela-wrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--texto-3) var(--superficie); } }
+input.busca { width: 220px; padding: 6px 10px; min-height: 36px; }
+/* Tara automática (Lojas e caixas): lojas e exceções lado a lado. */
+.tara-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: var(--e-5); margin-top: var(--e-3); }
+.tara-grade h4 { margin: 0 0 var(--e-2); font-size: 13px; color: var(--texto-2); font-weight: 600; }
+.tara-grade td select { width: 100%; }
+.tara-nova { margin-top: var(--e-3); }
+.tara-nova select { flex: 1 1 180px; min-width: 0; }
+#blocoTara > .apoio { margin: var(--e-1) 0 var(--e-3); max-width: 90ch; }
+/* A coluna do cadastro é estreita: abaixo de 1500px as duas tabelas ficam uma embaixo da outra. */
+@media (max-width: 1500px) { .tara-grade { grid-template-columns: 1fr; } }
+/* "Mais filtros": quando um filtro dele está ativo, fica destacado como os botões. */
+select.filtro-mais.ativo { background: var(--texto); color: var(--superficie); border-color: var(--texto); }
+/* Loja inteira sem contato: uma linha de resumo, destacada, no lugar de dezenas de linhas. */
+.tabela tr.linha-grupo > * { background: color-mix(in srgb, var(--critico) 7%, var(--superficie)); }
+.tabela { width: 100%; border-collapse: collapse; }
+.tabela th, .tabela td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+.tabela thead th {
+  position: sticky;
+  top: 0;
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  font-size: var(--t-apoio);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.tabela tbody th { font-weight: 600; }
+.tabela tbody tr:last-child > * { border-bottom: 0; }
+.tabela tbody tr:hover > * { background: color-mix(in srgb, var(--superficie-2) 60%, transparent); }
+.tabela tr.inativo > * { color: var(--texto-3); }
+.caixa-id, .tabela .mono { white-space: nowrap; }
+.acoes-linha { white-space: nowrap; text-align: right !important; }
+.vazio-tabela { color: var(--texto-2); padding: var(--e-6) var(--e-4) !important; text-align: center !important; }
+.mais-registro { display: flex; justify-content: center; margin-top: var(--e-4); }
+
+/* Situação: ponto + texto (nunca só cor) */
+.sit { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.sit::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.sit-ok { color: var(--ok); }
+.bloco-sit { display: flex; margin-top: 4px; }
+.sit-alerta { color: var(--alerta); }
+.sit-critico { color: var(--critico); }
+.sit-neutro { color: var(--texto-3); }
+.sit-venda { color: var(--venda); }
+
+/* ------------------------------------------------------------ indicadores */
+/* Cores dos gráficos: um tom abaixo do âmbar/azul do painel, para marcas sobre o fundo escuro
+   (faixa de luminosidade e daltonismo validados). Texto nunca usa a cor do dado. */
+.adm { --grafico-alerta: #c77c05; --grafico-venda: #3b82f6; --grade: #232a34; }
+.ind-conteudo { transition: opacity .15s ease-out; }
+.ind-conteudo.carregando { opacity: .55; }
+/* Faixa de números: linhas finas entre os blocos desenhadas por cada bloco (e não pelo fundo),
+   assim a última linha incompleta não deixa um retângulo cinza sobrando. */
+.ind-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-bottom: var(--e-6);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ind-numero { display: grid; gap: 2px; align-content: start; padding: var(--e-4); background: var(--superficie); box-shadow: 1px 0 0 var(--borda), 0 1px 0 var(--borda); }
+/* Rótulo com altura de 2 linhas: se um quebra, os valores continuam alinhados entre os blocos. */
+.ind-rotulo { color: var(--texto-2); font-size: var(--t-apoio); line-height: 1.3; min-height: 2.6em; }
+.saiba-mais { margin: calc(-1 * var(--e-3)) 0 var(--e-4); color: var(--texto-2); font-size: var(--t-apoio); max-width: 90ch; }
+.saiba-mais summary { cursor: pointer; color: var(--venda); width: fit-content; }
+.saiba-mais p { margin: var(--e-1) 0 0; }
+.ind-valor { font-size: 28px; font-weight: 650; line-height: 1.15; letter-spacing: -.01em; font-variant-numeric: normal; }
+.ind-sub { color: var(--texto-3); font-size: 12px; }
+.ind-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); }
+.ind-cartao { min-width: 0; padding: var(--e-4) var(--e-5) var(--e-5); background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; }
+.ind-largo { grid-column: 1 / -1; }
+.ind-cartao h3 { margin: 0; font-size: 15px; }
+.ind-legenda { margin: 2px 0 var(--e-4); color: var(--texto-2); font-size: var(--t-apoio); }
+
+/* Colunas (alertas por hora): eixo com 3 marcas, linhas de grade finas, barras de até 24px. */
+.colunas { display: grid; grid-template-columns: auto 1fr; gap: var(--e-2); height: 200px; }
+.colunas-eixo { display: flex; flex-direction: column; justify-content: space-between; color: var(--texto-3); font-size: 12px; text-align: right; padding-bottom: 20px; }
+.colunas-eixo span { line-height: 1; transform: translateY(-50%); }
+.colunas-eixo span:last-child { transform: translateY(50%); }
+.colunas-area {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding-bottom: 20px;
+  background:
+    linear-gradient(var(--grade), var(--grade)) top / 100% 1px no-repeat,
+    linear-gradient(var(--grade), var(--grade)) center calc(50% - 10px) / 100% 1px no-repeat,
+    linear-gradient(var(--borda), var(--borda)) bottom 20px left 0 / 100% 1px no-repeat;
+}
+.coluna { position: relative; flex: 1; display: flex; align-items: flex-end; justify-content: center; border-radius: 4px; cursor: default; }
+.coluna:hover, .coluna:focus-visible { background: rgb(255 255 255 / 4%); }
+.coluna:focus-visible { outline: 2px solid var(--foco); outline-offset: 1px; }
+.coluna-barra { width: min(24px, 70%); border-radius: 4px 4px 0 0; }
+.coluna-pico { position: absolute; left: 50%; transform: translate(-50%, -4px); font-size: 12px; font-weight: 650; color: var(--texto); }
+.coluna-rotulo { position: absolute; bottom: -20px; font-size: 11px; color: var(--texto-3); }
+.ambar { background: var(--grafico-alerta); }
+.azul { background: var(--grafico-venda); }
+/* Contingência: barra neutra; vermelha (estado crítico, com o texto "verificar") só acima do limite. */
+.barra.neutra { background: var(--texto-3); }
+.barra.critica { background: var(--critico); }
+.tab-barras tr.linha-alta > * { background: color-mix(in srgb, var(--critico) 6%, transparent); }
+.cont-atencao { margin: 0 0 var(--e-4); max-width: 90ch; }
+.cont-atencao .sit { margin-right: var(--e-1); }
+
+/* Contingência: resumo em linha (três números) acima das tabelas. */
+.cont-resumo { display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-6); margin: 0 0 var(--e-4); }
+.cont-resumo div { display: grid; gap: 1px; }
+.cont-resumo strong { font-size: 20px; font-weight: 650; line-height: 1.2; }
+.cont-resumo span { color: var(--texto-3); font-size: 12px; }
+.cont-tabelas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-5); }
+.cont-tabelas h4 { margin: 0 0 var(--e-2); font-size: 13px; color: var(--texto-2); font-weight: 600; }
+@media (max-width: 900px) { .cont-tabelas { grid-template-columns: 1fr; } }
+
+/* Tabela com barra: o número fica na coluna ao lado, a barra só dá a proporção. */
+.tab-barras { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tab-barras th, .tab-barras td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--grade); }
+.tab-barras thead th { color: var(--texto-2); font-size: 12px; font-weight: 600; border-bottom-color: var(--borda); white-space: nowrap; }
+.tab-barras tbody th { font-weight: 500; white-space: nowrap; }
+.tab-barras tbody tr:last-child > * { border-bottom: 0; }
+.tab-barras .num { text-align: right; white-space: nowrap; }
+.barra-celula { width: 28%; min-width: 80px; }
+.barra { height: 12px; min-width: 2px; border-radius: 0 4px 4px 0; }
+.ind-cartao { overflow-x: auto; }
+
+/* Dica dos gráficos: valor em destaque, rótulo embaixo. */
+.dica-grafico {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+  pointer-events: none;
+  font-size: 12px;
+  color: var(--texto-2);
+}
+.dica-grafico strong { color: var(--texto); font-size: 14px; }
+
+@media (max-width: 1000px) {
+  .ind-grade { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------------ cadastro */
+/* minmax(0, …): a tabela rola dentro da própria caixa em vez de alargar a página (celular). */
+.cadastro { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: var(--e-6); align-items: start; }
+.cadastro-detalhe > * { min-width: 0; }
+.bloco-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e-3); margin-bottom: var(--e-3); flex-wrap: wrap; }
+.bloco-cab h3 { margin: 0; font-size: 16px; }
+.bloco-cab h3 .apoio { font-weight: 400; }
+.cadastro-detalhe { display: grid; gap: var(--e-8); min-width: 0; }
+.lojas { position: sticky; top: var(--e-5); }
+.lista-lojas { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.linha-loja { display: flex; align-items: center; gap: 2px; }
+.item-loja {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e-2);
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  padding: 8px 10px;
+}
+.item-loja:hover { background: var(--superficie); border-color: var(--borda); }
+.item-loja[aria-pressed='true'] { background: var(--superficie-2); border-color: var(--borda); }
+.item-loja .apoio { white-space: nowrap; }
+.lista-lojas > li:first-child { margin-bottom: var(--e-2); }
+
+.lista-estacoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--e-3); }
+.lista-estacoes > .vazio-tabela { grid-column: 1 / -1; margin: 0; border: 1px dashed var(--borda); border-radius: 10px; }
+.estacao { background: var(--superficie); border: 1px solid var(--borda); border-radius: 10px; padding: var(--e-3) var(--e-4); }
+.estacao-cab { display: flex; justify-content: space-between; align-items: center; gap: var(--e-2); }
+.estacao-cab h4 { margin: 0; font-size: 15px; }
+.estacao-dados { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--e-3); margin: var(--e-2) 0 0; }
+.estacao-dados dt { color: var(--texto-2); font-size: var(--t-apoio); }
+.estacao-dados dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* Barra de alterações pendentes */
+.pendente {
+  position: fixed;
+  left: calc(50% + var(--lateral, 0px) / 2); /* centro da área de conteúdo (acompanha a barra lateral) */
+  bottom: var(--e-5);
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: var(--e-2) var(--e-2) var(--e-2) var(--e-5);
+  background: var(--superficie-2);
+  border: 1px solid color-mix(in srgb, var(--alerta) 60%, var(--borda));
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 50%);
+  font-weight: 650;
+}
+.pendente span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--alerta); margin-right: 8px; vertical-align: middle; }
+
+/* ------------------------------------------------------------ diálogo */
+.adm-dialogo {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 60%);
+}
+.adm-dialogo::backdrop { background: rgb(5 7 10 / 72%); }
+.adm-dialogo form { display: grid; gap: var(--e-4); padding: var(--e-6); }
+.adm-dialogo h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+.adm-dialogo p { margin: 0; }
+#dlgCorpo { display: grid; gap: var(--e-3); }
+.campos { display: grid; gap: var(--e-4); }
+.campos label { display: grid; gap: 6px; color: var(--texto-2); font-size: var(--t-apoio); }
+.campos label input, .campos label select, .campos label textarea { color: var(--texto); font-size: var(--t-corpo); }
+.campos small { color: var(--texto-3); font-size: 12px; line-height: 1.4; }
+.campos-lado { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-3); }
+label.marcar { display: inline-flex !important; align-items: center; gap: var(--e-2); color: var(--texto); font-size: var(--t-corpo); cursor: pointer; }
+.previa { color: var(--texto); font-size: var(--t-apoio); min-height: 1.4em; }
+.caixas-estacao { display: grid; gap: var(--e-3); max-height: 340px; overflow-y: auto; padding-right: var(--e-1); }
+.caixas-estacao .rotulo { color: var(--texto-2); font-size: var(--t-apoio); margin: 0; }
+.grupo-caixas { border: 1px solid var(--borda); border-radius: 10px; padding: var(--e-2) var(--e-3) var(--e-3); margin: 0; }
+.grupo-caixas legend { padding: 0 var(--e-1); font-weight: 600; }
+.grade-caixas { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--e-2) var(--e-4); }
+.zona-perigo { display: flex; justify-content: space-between; align-items: center; gap: var(--e-3); padding-top: var(--e-4); border-top: 1px solid var(--borda); color: var(--texto-2); font-size: var(--t-apoio); }
+.lista-mudancas { margin: 0; padding-left: var(--e-5); display: grid; gap: 6px; max-height: 320px; overflow-y: auto; }
+
+/* Aviso que some sozinho */
+.aviso-flutuante {
+  position: fixed;
+  top: var(--e-5);
+  right: var(--e-6);
+  z-index: 30;
+  max-width: 420px;
+  padding: var(--e-3) var(--e-4);
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--superficie-2);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 50%);
+  font-weight: 600;
+}
+.aviso-flutuante.ok { border-color: color-mix(in srgb, var(--ok) 55%, var(--borda)); }
+.aviso-flutuante.erro { border-color: var(--critico); color: var(--texto); }
+
+/* Acesso restrito */
+.restrito {
+  width: min(460px, 100%);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  padding: var(--e-8);
+  display: grid;
+  gap: var(--e-4);
+}
+.restrito h1 { margin: 0; font-size: 20px; }
+.restrito p { margin: 0; color: var(--texto-2); }
+
+@media (max-width: 900px) {
+  .cadastro { grid-template-columns: minmax(0, 1fr); }
+  .lojas { position: static; }
+  .adm-main { padding: var(--e-4); padding-bottom: 96px; }
+  /* Tela estreita: a barra lateral vira uma faixa no alto, com as seções roláveis de lado. */
+  #app:not([hidden]) { display: block; }
+  #app:not([hidden]) > .adm-lateral { width: auto; overflow: visible; }
+  .adm-lateral {
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--e-2) var(--e-3);
+    padding: var(--e-2) var(--e-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--borda);
+  }
+  .adm-marca { padding: 0; }
+  .adm-produto { display: none; }
+  .adm-rodape { margin: 0 0 0 auto; display: flex; align-items: center; gap: var(--e-1); }
+  .adm-voltar span, .adm-quem { display: none; }
+  .adm-conta { padding: 0; border: 0; }
+  .adm-abas { order: 3; flex-basis: 100%; display: flex; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--e-4)); padding: 0 var(--e-4); }
+  /* Borda direita esmaecida: mostra que há mais seções ao rolar de lado. */
+  .adm-abas { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); padding-right: 40px; }
+  .adm-abas a { flex: none; min-height: 36px; }
+  .pendente, .menu-recolhido .pendente { left: 50%; }
+  /* A faixa do alto já é compacta: sem botão de recolher, sempre com os nomes. */
+  .adm-recolher { display: none; }
+  .adm-cab-lateral { min-height: 0; }
+  #app.menu-recolhido .adm-marca { position: static; opacity: 1; max-width: none; }
+  #app.menu-recolhido .adm-abas a { gap: var(--e-3); padding: 0 var(--e-3); }
+  #app.menu-recolhido .adm-abas a span { opacity: 1; max-width: none; pointer-events: auto; }
+}
+@media (max-width: 560px) {
+  .campos-lado { grid-template-columns: 1fr; }
+  .pendente { left: var(--e-4); right: var(--e-4); transform: none; flex-wrap: wrap; }
+}

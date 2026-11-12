@@ -1,0 +1,26 @@
+{
+  "name": "painel-self",
+  "version": "0.1.0",
+  "description": "Painel de monitoramento em tempo real de self-checkouts, com acesso remoto via noVNC",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild node_modules/@novnc/novnc/lib/rfb.js --bundle --format=iife --global-name=NoVNC --minify --outfile=public/vendor/novnc.js",
+    "postinstall": "npm run build",
+    "start": "node server/index.js",
+    "usuario": "node server/cli-usuario.js",
+    "agente": "node agent/agente.js",
+    "simular": "node agent/simulador.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@novnc/novnc": "^1.5.0",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}

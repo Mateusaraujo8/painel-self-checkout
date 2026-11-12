@@ -1,0 +1,17 @@
+[Unit]
+Description=Agente do Painel Self-Checkout
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/painel-self/agente.py
+Restart=always
+RestartSec=5
+User=nobody
+Group=nogroup
+Environment=PYTHONUNBUFFERED=1
+# Log em UTF-8: sem isso o journalctl mostra "[blob data]" nas linhas com acento.
+Environment=PYTHONIOENCODING=utf-8
+
+[Install]
+WantedBy=multi-user.target

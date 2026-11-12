@@ -1,0 +1,751 @@
+/* Torre de controle: sempre escuro, independente do sistema (ver DESIGN.md). */
+:root {
+  --fundo: #0e1116;
+  --superficie: #171b22;
+  --superficie-2: #1d222b;
+  --borda: #2a313c;
+  --texto: #e8ebf0;
+  --texto-2: #a5adba;
+  --texto-3: #8a93a0;
+  --livre: #8b93a0;
+  --venda: #60a5fa;
+  --pagamento: #a78bfa;
+  /* Caixa fechado (PDV normal fora de turno): ciano, longe do verde de livre, do azul de em
+     venda e do cinza de sem conexão (distâncias medidas, inclusive para daltonismo). */
+  --fechado: #22d3ee;
+  --alerta: #f59e0b;
+  --alerta-fundo: #2a2112;
+  --critico: #f87171;
+  --critico-fundo: #2c1719;
+  --ok: #4ade80;
+  --offline: #5f6773;
+  /* Foco em branco (cor do texto): azul seria lido como "Em venda" (cor é estado). */
+  --foco: #e8ebf0;
+  --sombra: none;
+
+  /* Escala de tipo: pensada para leitura de pé, a 2–3 m do monitor. O que diz "o que fazer
+     agora" (fila, contadores, motivo) é o maior texto depois do número do PDV. */
+  --t-numero: 30px;
+  --t-contador: 40px;
+  --t-fila: 24px;
+  --t-alerta: 20px;
+  --t-titulo: 17px;
+  --t-corpo: 15px;
+  --t-apoio: 14px;
+
+  /* Espaçamento (base 4). */
+  --e-1: 4px;
+  --e-2: 8px;
+  --e-3: 12px;
+  --e-4: 16px;
+  --e-5: 20px;
+  --e-6: 24px;
+  --e-8: 32px;
+
+  color-scheme: dark;
+}
+
+/* Monitor grande: tudo cresce um degrau. */
+@media (min-width: 1600px) {
+  :root {
+    --t-numero: 36px;
+    --t-contador: 48px;
+    --t-fila: 28px;
+    --t-alerta: 22px;
+    --t-titulo: 19px;
+    --t-corpo: 16px;
+    --t-apoio: 15px;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+html { scrollbar-color: var(--borda) var(--fundo); }
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font: var(--t-corpo)/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+::selection { background: color-mix(in srgb, var(--venda) 40%, transparent); color: var(--texto); }
+input { caret-color: var(--texto); }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  color: var(--texto);
+  border-radius: 8px;
+  padding: 6px 12px;
+  min-height: 36px;
+}
+button:hover { background: var(--superficie-2); }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+button.primario { background: var(--texto); color: var(--superficie); border-color: var(--texto); }
+button.primario:hover { opacity: .88; }
+button[disabled], button[aria-disabled='true'] { opacity: .45; cursor: default; }
+input {
+  font: inherit;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+[hidden] { display: none !important; }
+.so-leitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Atalho de teclado: aparece só quando recebe o foco (primeiro Tab da página). */
+.pular {
+  position: fixed;
+  left: var(--e-4);
+  top: var(--e-2);
+  z-index: 50;
+  padding: var(--e-2) var(--e-4);
+  border-radius: 8px;
+  background: var(--texto);
+  color: var(--superficie);
+  font-weight: 650;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+.pular:focus-visible { transform: none; outline: 2px solid var(--foco); outline-offset: 2px; }
+main:focus { outline: none; }
+
+/* ------------------------------------------------------------ barra lateral + topo (só alertas) */
+/* Lateral fixa à esquerda com contadores, filtros e ações; em cima das telas fica só a fila de
+   alertas (e a faixa de queda de conexão, quando houver). Recolhida, vira uma coluna estreita
+   com os números e os ícones, e as telas ganham a largura. */
+#app:not([hidden]) {
+  --lateral: 232px;
+  --mov: 220ms cubic-bezier(.2, .8, .2, 1);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 100vh;
+}
+#app.menu-recolhido { --lateral: 88px; }
+#app.sem-animacao, #app.sem-animacao * { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { #app:not([hidden]) { --mov: 140ms ease-out; } }
+
+.lateral {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  width: var(--lateral);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-5);
+  padding: var(--e-4) var(--e-3);
+  background: var(--superficie);
+  border-right: 1px solid var(--borda);
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  transition: width var(--mov);
+}
+.conteudo { min-width: 0; }
+.ico { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.lat-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2); min-height: 44px; }
+.lat-marca { margin: 0; padding: 8px 0 0 var(--e-2); font-size: 16px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; text-wrap: balance; min-width: 0; }
+.lat-recolher {
+  flex: none; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0;
+  background: transparent; border-color: transparent; color: var(--texto-3);
+  transition: color .12s ease-out, background-color .12s ease-out;
+}
+.lat-recolher:hover { color: var(--texto); background: var(--superficie-2); border-color: var(--borda); }
+.lat-recolher .seta { transform-box: fill-box; transform-origin: center; transition: transform var(--mov); }
+.menu-recolhido .lat-recolher .seta { transform: rotate(180deg); }
+
+/* Contadores: um embaixo do outro, número grande (lido de longe) e rótulo ao lado. */
+.contadores { display: grid; gap: var(--e-1); padding: 0 var(--e-2); color: var(--texto-2); }
+.contadores > span { display: flex; align-items: baseline; gap: var(--e-3); white-space: nowrap; font-size: var(--t-corpo); }
+.contadores b { color: var(--texto); font-size: var(--t-contador); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; min-width: 1.3em; }
+.contadores .c-alerta.ativo b { color: var(--alerta); }
+.contadores .c-off b { color: var(--texto-2); }
+
+.lat-grupo { display: grid; gap: var(--e-2); }
+.lat-rotulo { padding: 0 var(--e-2); color: var(--texto-3); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.filtros { display: grid; gap: var(--e-2); }
+.filtros button { min-height: 44px; padding: 4px 12px; }
+.filtros button[aria-pressed='true'] { background: var(--texto); color: var(--superficie); border-color: var(--texto); }
+/* Self-checkout | PDV normal | Todos (só TI): um embaixo do outro, colados. */
+.filtros .tipos { display: grid; }
+.filtros .tipos button { border-radius: 0; margin-top: -1px; text-align: left; }
+.filtros .tipos button:first-child { border-radius: 8px 8px 0 0; margin-top: 0; }
+.filtros .tipos button:last-child { border-radius: 0 0 8px 8px; }
+.filtros > button[data-loja] { text-align: left; border-radius: 8px; }
+.filtros select {
+  font: inherit; color: var(--texto); background: var(--superficie-2);
+  border: 1px solid var(--borda); border-radius: 8px; padding: 6px 10px; min-height: 44px; width: 100%;
+}
+.filtros select:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.tamanhos { display: flex; gap: var(--e-1); }
+.tamanhos button { flex: 1; min-height: 44px; padding: 3px 6px; }
+.tamanhos button[aria-pressed='true'] { background: var(--texto); color: var(--superficie); border-color: var(--texto); }
+
+.lat-rodape { margin-top: auto; display: grid; gap: var(--e-1); }
+/* Dica dos atalhos: discreta, no rodapé; some com a lateral recolhida. */
+.lat-atalhos { display: grid; gap: 6px; margin: 0 0 var(--e-2); padding: 0 var(--e-2); color: var(--texto-3); font-size: var(--t-apoio); line-height: 1.3; }
+.lat-atalhos kbd, .zoom-barra kbd {
+  display: inline-block; min-width: 1.6em; margin-right: 6px; padding: 0 5px;
+  border: 1px solid var(--borda); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--superficie-2); color: var(--texto-2);
+  font: 600 12px/18px system-ui, sans-serif; text-align: center;
+}
+.menu-recolhido .lat-atalhos { display: none; }
+.conexao { display: flex; align-items: center; gap: var(--e-2); padding: var(--e-1) var(--e-2) var(--e-2); font-size: var(--t-apoio); color: var(--texto-2); white-space: nowrap; }
+.conexao::before { content: ''; flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); }
+.conexao.caiu { color: var(--critico); font-weight: 600; }
+.conexao.caiu::before { background: var(--critico); }
+.lat-acao {
+  display: flex; align-items: center; gap: var(--e-3); min-height: 44px; padding: 0 var(--e-2);
+  border: 1px solid transparent; border-radius: 8px; background: transparent;
+  color: var(--texto-2); text-decoration: none; font: inherit; text-align: left; white-space: nowrap;
+}
+.lat-acao:hover { color: var(--texto); background: var(--superficie-2); }
+.lat-acao:focus-visible { outline: 2px solid var(--foco); outline-offset: -2px; }
+#btnSom.ligado { color: var(--texto); }
+.lat-conta { display: flex; align-items: center; gap: var(--e-2); padding: var(--e-2) 0 0 var(--e-2); border-top: 1px solid var(--borda); margin-top: var(--e-1); }
+.usuario { flex: 1; min-width: 0; color: var(--texto-2); font-size: var(--t-apoio); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lat-sair { flex: none; display: grid; place-items: center; width: 44px; height: 44px; min-height: 44px; padding: 0; background: transparent; border-color: transparent; color: var(--texto-2); }
+.lat-sair:hover { color: var(--texto); background: var(--superficie-2); border-color: var(--borda); }
+
+/* Recolhida: só números (contadores) e ícones (som, configurações, sair). */
+.lateral .rot, .lat-marca, .lat-filtros, .lat-tamanhos, .usuario { transition: opacity 140ms ease-out; }
+.menu-recolhido .lateral { padding-inline: var(--e-2); }
+.menu-recolhido .lat-marca, .menu-recolhido .lat-filtros, .menu-recolhido .lat-tamanhos, .menu-recolhido .usuario { display: none; }
+.menu-recolhido .lateral .rot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.menu-recolhido .lat-cab { justify-content: center; }
+.menu-recolhido .contadores { padding: 0; justify-items: center; }
+.menu-recolhido .contadores b { min-width: 0; text-align: center; }
+/* Recolhida, o contador mantém o nome embaixo do número: só a cor não diz qual é qual. */
+.menu-recolhido .contadores { gap: var(--e-3); }
+.menu-recolhido .contadores > span { flex-direction: column; align-items: center; gap: 2px; white-space: normal; }
+.menu-recolhido .contadores .rot {
+  position: static; width: auto; height: auto; overflow: visible; clip: auto;
+  font-size: 13px; font-weight: 600; line-height: 1.15; text-align: center; text-wrap: balance; color: var(--texto-2);
+}
+.menu-recolhido .conexao, .menu-recolhido .lat-acao { justify-content: center; padding-inline: 0; }
+.menu-recolhido .lat-conta { justify-content: center; padding-left: 0; }
+
+/* Topo: só a fila de alertas (e a faixa de conexão). */
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--superficie-2);
+  border-bottom: 1px solid var(--borda);
+}
+
+/* Tela estreita: a lateral vira uma faixa no alto (rola junto com a página). */
+@media (max-width: 900px) {
+  #app:not([hidden]) { display: block; }
+  .lateral { position: static; width: auto; height: auto; flex-flow: row wrap; align-items: center; gap: var(--e-3); padding: var(--e-2) var(--e-4); border-right: 0; border-bottom: 1px solid var(--borda); }
+  .lat-recolher, .lat-atalhos { display: none; }
+  .contadores { grid-auto-flow: column; gap: var(--e-4); padding: 0; }
+  .filtros { display: flex; flex-wrap: wrap; }
+  .filtros .tipos { display: inline-flex; }
+  .filtros .tipos button:first-child { border-radius: 8px 0 0 8px; }
+  .filtros .tipos button:last-child { border-radius: 0 8px 8px 0; }
+  .filtros .tipos button { margin-top: 0; margin-left: -1px; }
+  .filtros select { width: auto; }
+  .lat-tamanhos { display: flex; align-items: center; }
+  .lat-rodape { margin: 0 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; }
+  .lat-conta { border: 0; margin: 0; padding: 0; }
+  #app.menu-recolhido .lat-marca, #app.menu-recolhido .lat-filtros, #app.menu-recolhido .lat-tamanhos, #app.menu-recolhido .usuario { display: revert; }
+}
+
+/* Faixa de queda de conexão: ocupa a largura toda, impossível de não ver. */
+.faixa-conexao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-1) var(--e-3);
+  align-items: baseline;
+  padding: var(--e-3) var(--e-5);
+  background: var(--critico-fundo);
+  border-bottom: 1px solid var(--critico);
+  font-size: var(--t-alerta);
+}
+.faixa-conexao strong { color: var(--texto); }
+.faixa-conexao span { color: var(--texto-2); font-size: var(--t-corpo); }
+
+/* ------------------------------------------------------------ fila de alertas */
+.fila {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--e-2);
+  padding: var(--e-2) var(--e-5);
+  align-items: stretch;
+  /* Sempre UMA linha e a mesma altura, com ou sem alerta: o cabeçalho não muda de tamanho
+     e as telas não pulam. O que não cabe vai para "Mais N alertas". */
+  height: 90px;
+  overflow: hidden;
+}
+/* Fila vazia: uma frase calma, com o ponto verde de "tudo certo" (forma + texto, não só cor). */
+.fila .vazia { display: inline-flex; align-items: center; gap: var(--e-3); align-self: center; color: var(--texto-2); font-size: var(--t-alerta); }
+.fila .vazia::before { content: ''; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--ok); }
+.fila .vazia strong { color: var(--texto); font-weight: 650; }
+/* Cada alerta tem a largura de "onde + tempo" (nunca encolhe nem corta o tempo); o motivo
+   segue essa largura e corta com reticências. O que não cabe vai para "Mais N". */
+.fila-item {
+  flex: none;
+  min-width: 240px;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  text-align: left;
+  /* Duas linhas cabem nos 90px da fila (linha mais justa que o corpo). */
+  line-height: 1.15;
+  padding: 4px var(--e-3);
+  border-color: var(--alerta);
+  background: var(--alerta-fundo);
+}
+.fila-item .fl1 { display: flex; align-items: baseline; gap: var(--e-2); white-space: nowrap; min-width: 0; }
+.fila-item .fl1 .tempo { margin-left: auto; padding-left: var(--e-2); }
+.fila-item .fl2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 0; min-width: 100%; font-size: 17px; }
+/* Onde e há quanto tempo: o que o fiscal precisa ler de longe. */
+.fila-item .onde, .fila-item .fl1 .tempo { font-size: var(--t-fila); letter-spacing: -.01em; }
+/* Não confirmado (o caixa parou de responder): por último, sem cor de urgência. */
+.fila-item.sem-sinal { background: var(--superficie); border-color: var(--borda); border-style: dashed; color: var(--texto-2); }
+.fila-item.sem-sinal:hover { background: var(--superficie-2); }
+.fila .mais { flex: none; align-self: center; margin-left: auto; }
+.fila .mais[aria-expanded='true'] { background: var(--texto); color: var(--superficie); border-color: var(--texto); }
+/* Lista dos alertas que não couberam: por cima das telas, alinhada à direita do topo. */
+.fila-mais {
+  position: absolute;
+  top: 100%;
+  right: var(--e-5);
+  z-index: 6;
+  display: grid;
+  gap: var(--e-2);
+  width: min(460px, calc(100vw - 2 * var(--e-5)));
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-top: var(--e-2);
+  padding: var(--e-3);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 55%);
+}
+.fila-mais .fila-item { max-width: none; }
+.fila-mais .fila-item { padding: var(--e-2) var(--e-3); min-width: 0; }
+.fila-item:hover { background: color-mix(in srgb, var(--alerta) 18%, var(--alerta-fundo)); }
+.fila-item .onde { font-weight: 700; }
+.fila-item .tempo { font-weight: 700; }
+.fila-item .quem { color: var(--texto); font-weight: 650; }
+.fila-item.p3 { border-color: var(--critico); background: var(--critico-fundo); }
+.fila-item.p3:hover { background: color-mix(in srgb, var(--critico) 16%, var(--critico-fundo)); }
+/* Atendido: sai do primeiro plano sem perder legibilidade; o local fica menor que o dos abertos. */
+.fila-item.atendido { background: var(--superficie); border-color: var(--borda); }
+.fila-item.atendido .onde, .fila-item.atendido .fl1 .tempo { font-size: var(--t-alerta); }
+.fila-item.atendido .motivo { color: var(--texto-2); }
+/* O mais urgente lidera a fila: borda grossa e o maior texto da linha. */
+.fila-item.proximo { padding: 4px var(--e-4); border-width: 3px; min-width: 280px; }
+.fila-item.proximo .onde, .fila-item.proximo .fl1 .tempo { font-size: calc(var(--t-fila) + 6px); }
+.fila-mais .fila-item.proximo { border-width: 1px; }
+.fila-mais .fila-item.proximo .onde, .fila-mais .fila-item.proximo .fl1 .tempo { font-size: var(--t-fila); }
+
+.selo {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--critico);
+  color: #1a0b0c;
+}
+
+/* ------------------------------------------------------------ grade */
+main { padding: var(--e-5); transition: opacity .2s ease-out, filter .2s ease-out; }
+main.desatualizado, .fila.desatualizado { opacity: .45; filter: grayscale(.8); }
+.loja { margin-bottom: var(--e-8); }
+/* A última loja não deixa sobra embaixo: o Auto conta exatamente até o fim dos cartões. */
+.loja:last-of-type { margin-bottom: 0; }
+.loja h2 { font-size: var(--t-apoio); text-transform: uppercase; letter-spacing: .06em; color: var(--texto-2); margin: 0 0 var(--e-3); font-weight: 650; }
+/* Mosaico de telas: todas com a mesma altura; a largura segue o formato de cada self. */
+:root { --altura-tela: 300px; }
+:root[data-telas='p'] { --altura-tela: 210px; }
+:root[data-telas='g'] { --altura-tela: 420px; }
+@media (min-width: 1600px) {
+  :root { --altura-tela: 360px; }
+  :root[data-telas='p'] { --altura-tela: 250px; }
+  :root[data-telas='g'] { --altura-tela: 500px; }
+}
+
+.grade { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--e-3); }
+@media (min-width: 1600px) { .grade { gap: var(--e-4); } }
+
+.caixa {
+  --aspecto: 1.3333;
+  --largura-tela: calc(var(--altura-tela) * var(--aspecto));
+  position: relative;
+  width: calc(var(--largura-tela) + 2 * var(--e-3) + 2px);
+  min-width: 170px;
+  max-width: 100%;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: var(--e-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--e-2);
+  scroll-margin-top: calc(var(--alt-cabecalho, 160px) + var(--e-4));
+  container-type: inline-size;
+}
+.caixa .info { display: flex; flex-direction: column; gap: var(--e-2); }
+
+/* Cartão estreito: o texto acompanha a largura do cartão, mas as linhas têm altura FIXA.
+   Se a altura mudasse com o tamanho, o ajuste Auto entraria em vaivém (telas pulando). */
+@container (max-width: 250px) {
+  .tela-alerta .linha2 { display: none; }
+}
+
+/* A tela ao vivo do self. A faixa do alerta fica na mesma área, por cima da parte de baixo,
+   mas como irmã da tela (não dentro): a tela é um botão e botão não pode conter botão. */
+.tela-area {
+  position: relative;
+  width: min(100%, var(--largura-tela));
+  margin-inline: auto;
+}
+.tela-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--aspecto);
+  max-height: var(--altura-tela);
+  background: #05070a;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: default;
+}
+.tela-wrap .tela { position: absolute; inset: 0; }
+.tela-wrap .tela > div { background: transparent !important; }
+/* Última imagem guardada enquanto a miniatura está pausada (fora da vista). */
+.tela-congelada { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.tela-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--e-3);
+  text-align: center;
+  color: var(--texto-2);
+  font-size: var(--t-apoio);
+  background: color-mix(in srgb, #05070a 70%, transparent);
+}
+.caixa.sem-imagem .tela { opacity: .35; }
+/* Camada que recebe o clique de ampliar (a miniatura VNC consome os eventos de mouse). */
+.tela-toque { position: absolute; inset: 0; z-index: 2; cursor: default; }
+.tela-wrap:hover .tela-toque { background: rgb(255 255 255 / 4%); }
+/* Uma linha só: a altura do cabeçalho é constante e o ajuste automático das telas fica exato. */
+.caixa .cab { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--e-2); min-width: 0; height: 34px; }
+.caixa .cab .status { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.caixa .tela-wrap:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+.caixa .num { font-size: clamp(18px, 14cqi, var(--t-numero)); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.caixa .status { font-size: var(--t-apoio); font-weight: 650; display: inline-flex; gap: 6px; align-items: center; color: var(--cor, var(--livre)); white-space: nowrap; }
+.caixa .status::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--ponto, currentColor); }
+
+/* Linha de baixo: o estado grande (lido de longe) e os detalhes pequenos ao lado. */
+.caixa .meta { display: flex; align-items: baseline; gap: var(--e-2); min-width: 0; height: 30px; overflow: hidden; }
+.caixa .meta .status { flex: none; font-size: clamp(14px, 8cqi, var(--t-alerta)); font-weight: 700; }
+.caixa .meta .status::before { width: 11px; height: 11px; align-self: center; }
+/* Notas sem autorização: texto claro com o sinal vermelho só num ponto (não pinta o cartão). */
+.notas-pendentes { color: var(--texto); font-weight: 650; }
+.notas-pendentes::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: var(--critico); vertical-align: 1px; }
+.caixa .meta .extra { color: var(--texto-2); font-size: var(--t-apoio); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Cor do estado (livre verde, em venda azul, pagamento roxo): só no ponto, no rótulo e
+   numa borda fina. O fundo fica neutro, para o alerta ser a única coisa forte na tela. */
+.caixa[data-status='livre'] { --cor: var(--ok); }
+.caixa[data-status='em_venda'] { --cor: var(--venda); }
+.caixa[data-status='pagamento'] { --cor: var(--pagamento); }
+.caixa[data-status='fechado'] { --cor: var(--fechado); }
+.caixa:is([data-status='livre'], [data-status='em_venda'], [data-status='pagamento'], [data-status='fechado']):not(.em-alerta):not(.offline) {
+  border-color: color-mix(in srgb, var(--cor) 65%, var(--borda));
+}
+
+/* ---- Alerta: sobre a parte de baixo da tela, com a ação. O cartão não cresce. */
+.tela-alerta {
+  position: absolute;
+  /* Dentro da borda de 1px da tela, com os cantos de baixo acompanhando o arredondado dela. */
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  border-radius: 0 0 5px 5px;
+  z-index: 3;
+  /* Coluna: o texto encolhe (e é cortado com reticências) antes do botão. O botão de ação
+     NUNCA sai da faixa, nem com motivo longo em tela pequena (1366x768). */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* No máximo ~metade da tela (a tela do cliente continua visível em cima), com piso para
+     caber motivo + botão de 44px; nunca maior que a própria tela. */
+  max-height: min(calc(100% - 2px), max(55%, 104px));
+  overflow: hidden;
+  padding: var(--e-2) var(--e-3) var(--e-3);
+  background: color-mix(in srgb, var(--alerta-fundo) 94%, transparent);
+  border-top: 2px solid var(--alerta);
+  cursor: default;
+}
+.tela-alerta .aviso { display: grid; gap: 2px; min-width: 0; min-height: 0; overflow: hidden; flex: 0 1 auto; }
+/* Motivo e tempo numa linha só: o tempo nunca some; o motivo corta com reticências (texto
+   inteiro na dica do cartão e na fila). */
+.tela-alerta .aviso-topo { display: flex; align-items: baseline; gap: var(--e-2); font-size: var(--t-alerta); min-width: 0; }
+.tela-alerta .aviso-topo strong { font-weight: 700; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.caixa .cab .selo { flex: none; margin-left: auto; font-size: var(--t-corpo); padding: 2px 8px; }
+/* Etiqueta do PDV normal na visão "Todos": neutra (não é estado), contorno fino.
+   O número do PDV nunca é cortado: quem encolhe é a etiqueta ("PDV normal" -> "Normal" -> reticências). */
+.caixa .cab:has(.tag-tipo) .num { flex: none; overflow: visible; }
+.caixa .cab .tag-tipo { flex: 0 1 auto; min-width: 0; margin-left: auto; padding: 1px 8px; border: 1px solid var(--borda); border-radius: 999px; color: var(--texto-2); font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caixa .cab .selo + .tag-tipo { margin-left: 0; }
+.caixa .cab .tag-tipo .tag-curta { display: none; }
+@container (max-width: 300px) {
+  .caixa .cab .tag-tipo { padding: 1px 6px; font-size: 11px; }
+  .caixa .cab .tag-tipo .tag-longa { display: none; }
+  .caixa .cab .tag-tipo .tag-curta { display: inline; }
+}
+.tela-alerta .tempo { font-weight: 700; white-space: nowrap; flex: none; }
+.tela-alerta .linha2 { color: color-mix(in srgb, var(--texto) 80%, var(--alerta)); font-size: var(--t-apoio); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Tela baixa (abaixo de 240px, ex.: 1366x768): faixa compacta de duas linhas (~80px), uma de
+   texto (motivo + tempo, também no atendido) e o botão. Uma linha só cortava o motivo. */
+:root[data-tela-baixa] .tela-alerta .linha2 { display: none; }
+:root[data-tela-baixa] .tela-alerta { gap: 4px; padding: 6px var(--e-2) var(--e-2); max-height: none; }
+:root[data-tela-baixa] .tela-alerta .aviso-topo { font-size: var(--t-titulo); }
+.tela-alerta .acoes { display: flex; flex: none; }
+.tela-alerta .acao-principal { flex: 1; font-size: var(--t-corpo); font-weight: 700; min-height: 44px; background: var(--alerta); border-color: var(--alerta); color: #1d1405; }
+/* Cartão largo (monitor grande): texto à esquerda e botão à direita, numa faixa só. A faixa
+   cobre ~1/4 da tela do cliente em vez de quase metade. */
+@container (min-width: 360px) {
+  .tela-alerta { flex-direction: row; align-items: center; gap: var(--e-3); }
+  .tela-alerta .aviso { flex: 1 1 auto; }
+  /* O motivo quebra em até 2 linhas (não corta "Divergência de peso"); o detalhe (linha2)
+     fica na tela ampliada e na dica. */
+  .tela-alerta .aviso-topo { flex-direction: column; align-items: flex-start; gap: 0; }
+  .tela-alerta .aviso-topo strong { flex: none; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; text-wrap: balance; }
+  .tela-alerta .aviso-topo .tempo { font-size: var(--t-corpo); }
+  .tela-alerta .linha2 { display: none; }
+  .tela-alerta .acao-principal { flex: none; padding-inline: var(--e-4); }
+}
+.caixa.em-alerta:not(.atendido) .acao-principal:hover { background: color-mix(in srgb, var(--alerta) 85%, white); }
+
+/* Alerta: a moldura mais forte da tela (3px) e o único elemento que pulsa. */
+.caixa.em-alerta { --cor: var(--alerta); border: 3px solid var(--alerta); padding: calc(var(--e-3) - 2px); background: color-mix(in srgb, var(--alerta) 7%, var(--superficie)); }
+.caixa.em-alerta .tela-wrap { border-color: var(--alerta); }
+.caixa.em-alerta.p3 { --cor: var(--critico); border-color: var(--critico); background: color-mix(in srgb, var(--critico) 8%, var(--superficie)); }
+.caixa.em-alerta.p3 .tela-wrap { border-color: var(--critico); }
+.caixa.em-alerta.p3 .tela-alerta { background: color-mix(in srgb, var(--critico-fundo) 94%, transparent); border-top-color: var(--critico); }
+.caixa.em-alerta.p3 .tela-alerta .linha2 { color: color-mix(in srgb, var(--texto) 80%, var(--critico)); }
+.caixa.em-alerta.p3 .acao-principal { background: var(--critico); border-color: var(--critico); color: #1f0a0b; }
+.caixa.em-alerta.p3:not(.atendido) .acao-principal:hover { background: color-mix(in srgb, var(--critico) 85%, white); }
+/* Atendido: alguém está indo. O cartão sai do primeiro plano (borda fina tracejada, fundo
+   neutro, sem pulso, estado "A caminho" embaixo): de longe, dois cartões não parecem duas
+   emergências. O motivo e o tempo continuam, em cinza. O botão vira "Liberar caixa", neutro. */
+.caixa.em-alerta.atendido { border: 2px dashed color-mix(in srgb, var(--alerta) 70%, var(--borda)); padding: calc(var(--e-3) - 1px); background: var(--superficie); }
+.caixa.em-alerta.atendido.p3 { border-color: color-mix(in srgb, var(--critico) 70%, var(--borda)); background: var(--superficie); }
+.caixa.em-alerta.atendido .tela-wrap { border-color: var(--borda); }
+.caixa.em-alerta.atendido .tela-alerta { background: color-mix(in srgb, var(--superficie-2) 96%, transparent); border-top: 2px dashed color-mix(in srgb, var(--cor) 70%, var(--borda)); }
+.caixa.em-alerta.atendido .tela-alerta .aviso-topo { color: var(--texto-2); }
+.caixa.em-alerta.atendido .acao-principal { background: var(--superficie); border-color: var(--borda); color: var(--texto); }
+.caixa.em-alerta.atendido .acao-principal:hover { background: var(--superficie-2); }
+
+/* Pulso do alerta: um anel por fora do cartão que só muda de opacidade (barato de animar,
+   não repinta o cartão). Crítico pulsa mais rápido: a diferença não depende só da cor. */
+.caixa.em-alerta:not(.atendido)::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 4px solid color-mix(in srgb, var(--alerta) 40%, transparent);
+  border-radius: 16px;
+  pointer-events: none;
+  opacity: 0;
+  animation: pulso 1.2s ease-in-out infinite;
+}
+.caixa.em-alerta.p3:not(.atendido)::after { border-color: color-mix(in srgb, var(--critico) 50%, transparent); animation-duration: .7s; }
+@keyframes pulso { 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .caixa.em-alerta:not(.atendido)::after { animation: none; opacity: 1; inset: -6px; border-width: 3px; }
+  main, .fila { transition: none; }
+}
+
+/* Liberando (contagem para desfazer) e logo depois: o cartão sai do modo alerta, tudo neutro. */
+/* Sem a cor da venda (o verde "Livre" diria que já terminou): borda e estado neutros. */
+.caixa.liberando { border-color: var(--borda); }
+.caixa.liberando .status { --cor: var(--texto-2); --ponto: var(--texto-3); }
+.caixa.liberando .tela-alerta { background: color-mix(in srgb, var(--superficie-2) 96%, transparent); border-top-color: var(--texto-3); }
+.caixa.liberando .acao-principal { background: var(--superficie); border-color: var(--borda); color: var(--texto); }
+.caixa.liberando .acao-principal:hover { background: var(--superficie-2); }
+
+/* Alerta de um caixa que parou de responder: não confirmado, sem pulso nem cor de urgência. */
+.caixa.alerta-sem-sinal .tela-alerta { background: color-mix(in srgb, var(--superficie-2) 96%, transparent); border-top: 2px dashed var(--texto-3); }
+.caixa.alerta-sem-sinal .tela-alerta .linha2 { color: var(--texto-2); }
+.caixa.alerta-sem-sinal .acao-principal { background: var(--superficie); border-color: var(--borda); color: var(--texto); }
+.caixa.alerta-sem-sinal .acao-principal:hover { background: var(--superficie-2); }
+
+/* ------------------------------------------------------------ caixa ampliado */
+.zoom { position: fixed; inset: 0; z-index: 50; }
+.zoom-fundo {
+  position: absolute;
+  inset: 0;
+  background: rgb(5 7 10 / 80%);
+  opacity: 0;
+  transition: opacity .28s ease-out;
+}
+.zoom.aberto .zoom-fundo { opacity: 1; }
+.zoom-janela {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  overflow: hidden;
+  transform-origin: 0 0;
+  will-change: transform;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 55%);
+}
+.zoom-barra {
+  flex: none;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: 0 var(--e-3) 0 var(--e-4);
+  border-bottom: 1px solid var(--borda);
+  opacity: 0;
+  transition: opacity .2s ease-out .12s;
+}
+.zoom.aberto .zoom-barra { opacity: 1; }
+.zoom-barra strong { font-size: var(--t-alerta); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.zoom-barra button { flex: none; }
+.zoom-estado { color: var(--texto-2); font-size: var(--t-apoio); margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Controlando o caixa de um cliente: impossível não perceber. */
+.zoom.controlando .zoom-janela { border: 2px solid var(--foco); }
+.zoom.controlando .zoom-estado { color: var(--foco); font-weight: 700; font-size: var(--t-corpo); display: inline-flex; align-items: center; gap: var(--e-2); }
+.zoom.controlando .zoom-estado::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--foco); }
+/* Ctrl+Alt+Del: discreto e afastado do Fechar (pede confirmação ao clicar). */
+.zoom-barra .secundario { background: transparent; color: var(--texto-2); font-size: var(--t-apoio); margin-right: var(--e-5); }
+.zoom-tela { position: relative; flex: 1; width: var(--tela-w, 100%); margin-inline: auto; background: #05070a; }
+.zoom-previa, .zoom-vnc { position: absolute; inset: 0; width: 100%; height: 100%; }
+.zoom-vnc > div { background: transparent !important; }
+/* Self de toque não tem cursor; o noVNC copiaria esse cursor "vazio" e o mouse sumiria.
+   Forçamos a seta normal (o !important vence o estilo que o noVNC aplica no canvas). */
+.zoom-vnc canvas { cursor: default !important; }
+/* Linha do alerta na tela ampliada (abaixo da barra, nunca sobre a tela do self). */
+.zoom-alerta {
+  flex: none;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: var(--e-3);
+  padding: 0 var(--e-3) 0 var(--e-4);
+  background: var(--alerta-fundo);
+  border-bottom: 2px solid var(--alerta);
+  font-size: var(--t-corpo);
+}
+.zoom-alerta.p3 { background: var(--critico-fundo); border-bottom-color: var(--critico); }
+.zoom-alerta.neutro { background: var(--superficie-2); border-bottom-color: var(--borda); }
+.zoom-alerta.com-detalhe { height: 72px; }
+.zoom-alerta .za-bloco { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.zoom-alerta .za-texto { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Detalhe do alerta (o que conferir): texto claro, não cinza; é a instrução do caixa. */
+.zoom-alerta .za-detalhe { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--texto); font-size: var(--t-corpo); }
+.zoom-alerta .za-texto strong { font-size: var(--t-alerta); }
+.zoom-alerta .tempo { font-weight: 700; margin-left: var(--e-2); }
+.zoom-alerta .za-apoio { color: var(--texto-2); margin-left: var(--e-1); }
+.zoom-alerta .selo { vertical-align: 2px; margin-left: var(--e-2); }
+.zoom-alerta .za-acao { flex: none; min-height: 40px; min-width: 150px; font-weight: 700; background: var(--alerta); border-color: var(--alerta); color: #1d1405; }
+.zoom-alerta.p3 .za-acao { background: var(--critico); border-color: var(--critico); color: #1f0a0b; }
+.zoom-alerta.neutro .za-acao { background: var(--superficie); border-color: var(--borda); color: var(--texto); }
+.zoom-barra .secundario.confirmar { color: var(--critico); border-color: var(--critico); }
+
+/* Falha ao abrir o controle: mensagem grande sobre a imagem, com "Tentar de novo" na barra. */
+.zoom-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--e-8);
+  text-align: center;
+  font-size: var(--t-alerta);
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--texto);
+  background: color-mix(in srgb, #05070a 78%, transparent);
+  text-wrap: balance;
+}
+/* Fechar: neutro. O destaque da janela é a ação do alerta (cheia na cor do sinal). */
+.zoom-barra .fechar kbd { margin: 0 0 0 var(--e-2); }
+.caixa.ampliado .tela-wrap { outline: 2px solid var(--foco); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .zoom-fundo, .zoom-barra { transition: none; }
+}
+
+/* Liberação com prazo para desfazer, e confirmação depois (também sobre a tela). */
+.tela-alerta .liberando { font-size: var(--t-corpo); font-weight: 650; color: var(--texto-2); }
+.tela-alerta:has(.liberado) { background: color-mix(in srgb, #0d2416 94%, transparent); border-top-color: var(--ok); }
+.tela-alerta .liberado { font-size: var(--t-alerta); font-weight: 700; color: var(--texto); }
+
+/* Botão fixo quando algum caixa ficou fora da tela */
+.fora-tela {
+  position: fixed;
+  left: 50%;
+  bottom: var(--e-4);
+  transform: translateX(-50%);
+  z-index: 20;
+  min-height: 44px;
+  padding: var(--e-2) var(--e-5);
+  border-radius: 999px;
+  font-weight: 650;
+  background: var(--texto);
+  color: var(--superficie);
+  border-color: var(--texto);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+}
+.fora-tela:hover { background: color-mix(in srgb, var(--texto) 88%, black); }
+.fora-tela.com-alerta { background: var(--alerta); border-color: var(--alerta); color: #1d1405; }
+
+/* Sem conexão: tracejado, esmaecido, mas com texto legível. */
+.caixa.offline { background: var(--superficie-2); border-style: dashed; }
+.caixa.offline .num { color: var(--texto-3); }
+.caixa.offline .status { --cor: var(--texto-3); --ponto: var(--offline); }
+/* Sem agente: estado permanente, não avaria. */
+.caixa.sem-agente .status { --cor: var(--texto-3); --ponto: var(--offline); }
+
+.vazio { text-align: center; color: var(--texto-2); padding: 80px var(--e-5); font-size: var(--t-alerta); }
+.vazio code { background: var(--superficie); border: 1px solid var(--borda); padding: 2px var(--e-2); border-radius: 4px; }
+
+/* ------------------------------------------------------------ login */
+.tela-login { min-height: 100vh; display: grid; place-items: center; padding: var(--e-4); }
+.tela-login form {
+  width: min(400px, 100%);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  padding: var(--e-8);
+  display: grid;
+  gap: var(--e-4);
+}
+.tela-login h1 { margin: 0; font-size: var(--t-titulo); }
+.tela-login label { display: grid; gap: 6px; color: var(--texto-2); font-size: var(--t-apoio); }
+.tela-login .erro { color: var(--critico); min-height: 1.4em; margin: 0; }
+.tela-login .aviso-caps { color: var(--alerta); font-size: var(--t-apoio); margin: 0; }
+
+@media (max-width: 640px) {
+  /* No celular o cabeçalho fixo tomaria a tela toda: ele rola junto. */
+  .cabecalho { position: static; }
+  main, .fila, .faixa-conexao { padding-left: var(--e-4); padding-right: var(--e-4); }
+
+}

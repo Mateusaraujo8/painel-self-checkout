@@ -1,0 +1,8 @@
+{
+  "porta": 8080,
+  "tokenAgente": "gere-um-token-longo-e-aleatorio",
+  "senhaVnc": "senha-vnc-dos-caixas",
+  "segundosOffline": 20,
+  "versaoMinimaAgente": "1.0.0",
+  "portaVncPadrao": 5900
+}
